@@ -259,3 +259,19 @@ file(RENAME ${CACHE_PATH}/bun-webkit ${WEBKIT_PATH})
 if(APPLE)
   file(REMOVE_RECURSE ${WEBKIT_INCLUDE_PATH}/unicode)
 endif()
+
+# Patch simde neon.h for clang-cl ARM64 compatibility.
+# The MSVC workaround uses intrinsics that clang-cl doesn't provide.
+# TODO: Remove once WebKit is rebuilt with the upstream fix.
+if(WIN32 AND CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64|AARCH64")
+  set(SIMDE_NEON_H "${WEBKIT_INCLUDE_PATH}/wtf/simde/arm/neon.h")
+  if(EXISTS "${SIMDE_NEON_H}")
+    file(READ "${SIMDE_NEON_H}" SIMDE_CONTENT)
+    string(REPLACE
+      "(defined _MSC_VER) && (defined SIMDE_ARM_NEON_A64V8_NATIVE)"
+      "(defined _MSC_VER) && !defined(__clang__) && (defined SIMDE_ARM_NEON_A64V8_NATIVE)"
+      SIMDE_CONTENT "${SIMDE_CONTENT}")
+    file(WRITE "${SIMDE_NEON_H}" "${SIMDE_CONTENT}")
+    message(STATUS "Patched simde/arm/neon.h for clang-cl ARM64 compatibility")
+  endif()
+endif()

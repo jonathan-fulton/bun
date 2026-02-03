@@ -470,10 +470,11 @@ function getBuildCommand(target, options, label) {
  */
 function getWindowsArm64CrossFlags(target) {
   if (target.os === "windows" && target.arch === "aarch64") {
-    return " --toolchain windows-aarch64 -DSKIP_CODEGEN=ON -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl";
+    return " --toolchain windows-aarch64";
   }
   return "";
 }
+
 
 /**
  * @param {Platform} platform
@@ -481,8 +482,18 @@ function getWindowsArm64CrossFlags(target) {
  * @returns {Step}
  */
 function getBuildCppStep(platform, options) {
+  const { os, arch } = platform;
   const command = getBuildCommand(platform, options);
   const crossFlags = getWindowsArm64CrossFlags(platform);
+
+  // Build commands for C++ dependencies and bun
+  const buildCommands = [`${command}${crossFlags} --target bun`, `${command}${crossFlags} --target dependencies`];
+
+  // Cross-compiling Windows ARM64 from x64 requires Rust ARM64 target
+  if (os === "windows" && arch === "aarch64") {
+    buildCommands.unshift("rustup target add aarch64-pc-windows-msvc");
+  }
+
   return {
     key: `${getTargetKey(platform)}-build-cpp`,
     label: `${getTargetLabel(platform)} - build-cpp`,
@@ -496,7 +507,7 @@ function getBuildCppStep(platform, options) {
     // We used to build the C++ dependencies and bun in separate steps.
     // However, as long as the zig build takes longer than both sequentially,
     // it's cheaper to run them in the same step. Can be revisited in the future.
-    command: [`${command}${crossFlags} --target bun`, `${command}${crossFlags} --target dependencies`],
+    command: buildCommands,
   };
 }
 
